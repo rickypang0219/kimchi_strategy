@@ -1,4 +1,20 @@
 import polars as pl
+import datetime
+from binance import get_binance_custom_perp_hist_df
+from upbit import fetch_historical_candles
+
+
+def init_data() -> pl.DataFrame:
+    print("Data Fetching")
+    binance = get_binance_custom_perp_hist_df("BTCUSDT", "1h")
+    upbit = fetch_historical_candles(
+        "USDT-BTC", 60, datetime.datetime(2020, 1, 1), datetime.datetime.now()
+    )
+    binance = binance.rename({"SK": "timestamp", "C": "binance_close"}).with_columns(
+        pl.col("timestamp").cast(pl.Int64)
+    )
+    upbit = upbit.rename({"BTC_close": "upbit_close"}).sort("timestamp")
+    return merge_price_dataframe(upbit, binance)
 
 
 def merge_price_dataframe(
@@ -8,15 +24,5 @@ def merge_price_dataframe(
 
 
 if __name__ == "__main__":
-    upbit_df = (
-        pl.read_csv("./upbit_btc.csv")
-        .rename({"BTC_close": "upbit_close"})
-        .sort("timestamp")
-    )
-    binance_df = pl.read_csv("./binance_btc.csv").rename(
-        {"SK": "timestamp", "C": "binance_close"}
-    )
-    print(upbit_df)
-    merged_df = merge_price_dataframe(upbit_df, binance_df)
+    merged_df = init_data()
     print(merged_df)
-    merged_df.write_csv("factor.csv")

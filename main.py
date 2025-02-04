@@ -3,6 +3,7 @@ import numpy as np
 from multiprocessing import Pool
 import seaborn as sns
 import matplotlib.pyplot as plt
+from data_merging import init_data
 
 
 def update_position(
@@ -141,7 +142,7 @@ class BackTester:
             return (mean / sd) * np.sqrt(trading_days)
         return 0
 
-    def _compute_max_drawdown(self, trade_info: pl.DataFrame):
+    def _compute_max_drawdown(self, trade_info: pl.DataFrame) -> float:
         returns = trade_info.select("PnL").drop_nulls().to_numpy()
         cum_prod_returns = np.cumprod(1 + returns)
         running_max = np.maximum.accumulate(cum_prod_returns)
@@ -155,12 +156,33 @@ class BackTester:
             return long_count / short_count
         return None
 
-    def print_trade_summary_stats(self, rolling_window: int, multiplier: float) -> None:
+    def _compute_cagr(self, trade_info: pl.DataFrame, days=365) -> float | None:
+        trade_info = self._convert_humanized_timestamp(trade_info)
+        trade_info = (
+            trade_info.with_columns(pl.col("humanized_timestamp").dt.truncate("1d"))
+            .group_by("humanized_timestamp")
+            .agg(
+                [
+                    pl.col("PnL").sum().alias("aggPnL"),
+                    pl.col("returns").sum().alias("aggReturns"),
+                ]
+            )
+        )
+        agg_pnl = trade_info["aggPnL"].drop_nulls().to_numpy()
+        cum_pnl = (1 + agg_pnl).cumprod()
+        start_val, end_val = cum_pnl[0], cum_pnl[-1]
+        n_years = len(cum_pnl) / days
+        return (end_val / start_val) ** (1 / n_years) - 1 if start_val != 0 else None
+
+    def print_trade_summary_stats(
+        self, rolling_window: float | int, multiplier: float
+    ) -> None:
         trade_info = self._compute_trade_statistics(rolling_window, multiplier)
         sharpe: float = self.compute_sharpe_ratio(trade_info, 365)
         ir: float = self.compute_information_ratio(trade_info, 365)
         mdd = self._compute_max_drawdown(trade_info)
         ls_ratio = self._compute_long_short_ratio(trade_info)
+        cagr = self._compute_cagr(trade_info, 365)
         print(
             f"### Trade Summary Statistics ### \n"
             f"Params Set {rolling_window, multiplier} \n"
@@ -169,7 +191,8 @@ class BackTester:
             f"Annualized Sharpe Ratio: {sharpe:.3f} \n"
             f"Annualized Information Ratio: {ir:.3f} \n"
             f"Maximum Drawdown: {mdd * 100:.0f}% \n"
-            f"Long Short Ratio: {ls_ratio:.3f} \n"
+            f"Long Short Ratio: {ls_ratio if ls_ratio is not None else 'error'}  \n"
+            f"CAGR :{cagr * 100 if cagr is not None else 'error'} % \n"
             f"################################ \n"
         )
 
@@ -239,15 +262,20 @@ class BackTester:
 
 if __name__ == "__main__":
     factors_df = pl.read_csv("factor.csv")
-    factors_df = factors_df[: len(factors_df), :]
-    backtester = BackTester(factors_df)
-    # trade_info = backtester._compute_trade_statistics(0.062, 0.08)
-    # position = trade_info["position"].to_numpy()
-    # plt.figure()
-    # plt.plot(position)
-    # plt.show()
-
-    x = np.linspace(0.05, 0.35, 20)
-    y = np.linspace(0.15, 0.45, 20)
+    # factors_df = init_data()
+    backtest_df = factors_df[: len(factors_df) // 2, :]
+    backtester = BackTester(backtest_df)
+    x = np.linspace(0.01, 0.15, 20)
+    y = np.linspace(0.01, 0.3, 20)
     backtester.optimize_params_and_plot_heatmap(x, y)
-    plt.show()
+
+    # Forward Test
+    forward_df = factors_df[len(factors_df) // 2 :, :]
+    backtester_forward = BackTester(forward_df)
+    forward_x = np.linspace(0.01, 0.15, 20)
+    forward_y = np.linspace(0.01, 0.3, 40)
+    backtester_forward.optimize_params_and_plot_heatmap(forward_x, forward_y)
+
+    trade_info = backtester_forward._compute_trade_statistics(0.1, 0.25)
+    backtester_forward.print_trade_summary_stats(0.01, 0.25)
+    backtester_forward.plot_returns(trade_info)

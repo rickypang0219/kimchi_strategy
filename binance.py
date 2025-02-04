@@ -50,55 +50,6 @@ def convert_perp_futures_to_db_items(
     ]
 
 
-def fetch_binance_perpetual_candles(
-    symbol: str, start_timestamp: int, end_timestamp: int, limit: int = 10
-) -> list:
-    res = requests.get(
-        url="https://fapi.binance.com/fapi/v1/continuousKlines",
-        params={
-            "pair": symbol,
-            "startTime": int(start_timestamp),
-            "endTime": int(end_timestamp),
-            "contractType": "PERPETUAL",
-            "interval": "1h",
-            "limit": limit,
-        },
-        timeout=60,
-    )
-
-    res.raise_for_status()  # Raise an exception for HTTP errors
-    return res.json()
-
-
-def get_binance_perp_hist_data(symbol: str, start_date: str, end_date: str) -> list:
-    start_datetime = datetime.strptime(start_date, "%Y-%m-%d")
-    end_datetime = datetime.strptime(end_date, "%Y-%m-%d")
-    start_time = int(start_datetime.timestamp() * 1000)
-    end_time = int(end_datetime.timestamp() * 1000)
-    all_klines = []
-
-    while start_time < end_time:
-        klines = fetch_binance_perpetual_candles(
-            symbol, start_time, end_time, limit=1500
-        )
-        if not klines:
-            print("No klines returned, breaking loop.")
-            break
-        all_klines.extend(klines)
-        start_time = klines[-1][0] + 1  # Move to the next timestamp
-    return all_klines
-
-
-def get_binance_1h_perp_hist_df(symbol: str) -> pl.DataFrame:
-    start_date = "2024-01-01"
-    end_date_df = datetime.now().date() + timedelta(days=1)
-    end_date = end_date_df.strftime("%Y-%m-%d")
-    data = get_binance_perp_hist_data(symbol, start_date, end_date)
-    db_item = convert_perp_futures_to_db_items(data, symbol)
-    df = pl.DataFrame(db_item)[:-1, :]  # exclude last row
-    return df.select(["SK", "C"]).sort("SK")
-
-
 def fetch_binance_perpetual_candles_custom(
     symbol: str,
     start_timestamp: int,
@@ -137,7 +88,7 @@ def get_binance_perp_hist_data_custom(
             symbol, start_time, end_time, interval, limit=1500
         )
         if not klines:
-            print("No klines returned, breaking loop.")
+            print("No klines returned, Complete Binance Data Fetching.")
             break
         all_klines.extend(klines)
         start_time = klines[-1][0] + 1  # Move to the next timestamp

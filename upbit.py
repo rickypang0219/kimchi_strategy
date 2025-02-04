@@ -32,6 +32,7 @@ def fetch_historical_candles(market, unit, from_date, to_date):
 
         data = response.json()
         if not data:
+            print("Upbit Data Fetching Completed")
             break
 
         candles.extend(
@@ -49,8 +50,6 @@ def fetch_historical_candles(market, unit, from_date, to_date):
         to = datetime.datetime.strptime(
             data[-1]["candle_date_time_utc"], "%Y-%m-%dT%H:%M:%S"
         )
-        print(f"succesfully fetch {len(data)} data")
-
     return pl.DataFrame(candles)
 
 
