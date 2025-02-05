@@ -107,7 +107,7 @@ def get_binance_custom_perp_hist_df(symbol: str, interval: str) -> pl.DataFrame:
 
 
 if __name__ == "__main__":
-    resolution = "1h"
+    resolution = "15m"
     res = get_binance_custom_perp_hist_df("BTCUSDT", resolution)
     res.write_csv("binance_btc.csv")
     print(res)

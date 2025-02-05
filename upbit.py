@@ -73,10 +73,9 @@ def fetch_all_coins_dataframe(
 
 if __name__ == "__main__":
     market = "USDT-BTC"
-    unit = 60  # 60-minute intervals
+    unit = 15  # 60-minute intervals
     from_date = datetime.datetime(2020, 1, 1)
-    # to_date = datetime.datetime.now().date() + datetime.timedelta(days=1)
     to_date = datetime.datetime.now()
     candles = fetch_historical_candles(market, unit, from_date, to_date)
-    # print(candles)
+    print(candles)
     candles.write_csv("upbit_btc.csv")

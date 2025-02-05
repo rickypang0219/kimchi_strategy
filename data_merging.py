@@ -6,15 +6,17 @@ from upbit import fetch_historical_candles
 
 def init_data() -> pl.DataFrame:
     print("Data Fetching")
-    binance = get_binance_custom_perp_hist_df("BTCUSDT", "1h")
+    binance = get_binance_custom_perp_hist_df("BTCUSDT", "15m")
     upbit = fetch_historical_candles(
-        "USDT-BTC", 60, datetime.datetime(2020, 1, 1), datetime.datetime.now()
+        "USDT-BTC", 15, datetime.datetime(2020, 1, 1), datetime.datetime.now()
     )
     binance = binance.rename({"SK": "timestamp", "C": "binance_close"}).with_columns(
         pl.col("timestamp").cast(pl.Int64)
     )
     upbit = upbit.rename({"BTC_close": "upbit_close"}).sort("timestamp")
-    return merge_price_dataframe(upbit, binance)
+    merged_df = merge_price_dataframe(upbit, binance)
+    merged_df.write_csv("factor.csv")
+    return merged_df
 
 
 def merge_price_dataframe(
